@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 // TestRLSimpleWriteRead tests a simple rate-limited write and read operation.
