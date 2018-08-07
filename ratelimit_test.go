@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"bytes"
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -20,9 +21,9 @@ func TestRLSimpleWriteRead(t *testing.T) {
 	rw := bytes.NewBuffer(make([]byte, 0))
 
 	// Wrap it into a rate limited ReadWriter.
-	c := make(chan struct{})
-	defer close(c)
-	rlc := NewRLReadWriter(rw, rl, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rlc := NewRLReadWriter(ctx, rw, rl)
 
 	// Create 1mb to write.
 	data := fastrand.Bytes(1000)
@@ -83,9 +84,9 @@ func TestRLParallelWriteRead(t *testing.T) {
 		rw := bytes.NewBuffer(make([]byte, 0))
 
 		// Wrap it into a rate limited ReadWriter.
-		c := make(chan struct{})
-		defer close(c)
-		rlc := NewRLReadWriter(rw, rl, c)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		rlc := NewRLReadWriter(ctx, rw, rl)
 
 		// Create 1mb to write.
 		data := fastrand.Bytes(bytesToWrite)

@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -30,8 +31,8 @@ type (
 	// rlReadWriter is a rate-limiting wrapper for the io.ReadWriter interface.
 	rlReadWriter struct {
 		io.ReadWriter
-		rl     *RateLimit
-		cancel <-chan struct{}
+		rl  *RateLimit
+		ctx context.Context
 	}
 	// rlConn is a rate-limiting wrapper for the net.Conn interface.
 	rlConn struct {
@@ -51,22 +52,22 @@ func NewRateLimit(readBPS, writeBPS int64, packetSize uint64) *RateLimit {
 }
 
 // NewRLReadWriter wraps a io.ReadWriter into a rlReadWriter.
-func NewRLReadWriter(rw io.ReadWriter, rl *RateLimit, cancel <-chan struct{}) io.ReadWriter {
+func NewRLReadWriter(ctx context.Context, rw io.ReadWriter, rl *RateLimit) io.ReadWriter {
 	return &rlReadWriter{
 		rw,
 		rl,
-		cancel,
+		ctx,
 	}
 }
 
 // NewRLConn wrap a net.Conn into a rlReadWriter.
-func NewRLConn(conn net.Conn, rl *RateLimit, cancel <-chan struct{}) net.Conn {
+func NewRLConn(ctx context.Context, conn net.Conn, rl *RateLimit) net.Conn {
 	return &rlConn{
 		Conn: conn,
 		rlrw: rlReadWriter{
 			ReadWriter: conn,
 			rl:         rl,
-			cancel:     cancel,
+			ctx:        ctx,
 		},
 	}
 }
@@ -179,7 +180,7 @@ func (l *rlReadWriter) readPacket(b []byte) (n int, err error) {
 	// Sleep until it is safe to read.
 	select {
 	case <-time.After(time.Until(wb)):
-	case <-l.cancel:
+	case <-l.ctx.Done():
 		return 0, errors.New("read cancelled due to interrupt")
 	}
 	return l.ReadWriter.Read(b)
@@ -214,7 +215,7 @@ func (l *rlReadWriter) writePacket(b []byte) (n int, err error) {
 	// Sleep until it is safe to write.
 	select {
 	case <-time.After(time.Until(wb)):
-	case <-l.cancel:
+	case <-l.ctx.Done():
 		return 0, errors.New("write cancelled due to interrupt")
 	}
 	return l.ReadWriter.Write(b)
